@@ -1,0 +1,27 @@
+{
+    "data": {
+        "filename": "data/BTC.csv",
+        "filename_clean": "data/clean_data.h5",
+        "filter_columns": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+        ],
+        "batch_size": 64,
+        "train_test_split": 0.95,
+        "x_window_size": 100,
+        "y_window_size": 80,
+        "x_base_column": "close",
+        "y_predict_column": "high"
+    },
+    "model": {
+        "epochs": 1,
+        "dirname_save_model": "saved_models/",
+        "filename_model": "data/model_saved.h5"
+    },
+    "rule": {
+        "target_percent_change": 1
+    }
+}
