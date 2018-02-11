@@ -55,24 +55,22 @@ ntest = nrows - ntrain
 steps_test = int(ntest / configs['data']['batch_size'])
 print('> Testing model on', ntest, 'data rows with', steps_test, 'steps')
 
-batch_size = configs['data']['batch_size']
-n_batches = 100
 # Test the model
-data_gen_test = dl.generate_clean_data(-ntrain, -1)
+data_gen_test = dl.generate_clean_data(-ntest, -1)
 true_values = []
 predictions = model.predict(steps_test, data_gen_test, true_values)
 
 # Print stats
-s1 = stats.STATS(true_values[-ntrain:], predictions[-ntrain:], threshold=0.5)
+s1 = stats.STATS(true_values[-ntest:], predictions[-ntest:], threshold=0.5)
 s1.print_stats()
-s1 = stats.STATS(true_values[-ntrain:], predictions[-ntrain:], threshold=0.6)
+s1 = stats.STATS(true_values[-ntest:], predictions[-ntest:], threshold=0.6)
 s1.print_stats()
-s1 = stats.STATS(true_values[-ntrain:], predictions[-ntrain:], threshold=0.7)
+s1 = stats.STATS(true_values[-ntest:], predictions[-ntest:], threshold=0.7)
 s1.print_stats()
-s1 = stats.STATS(true_values[-ntrain:], predictions[-ntrain:], threshold=0.75)
+s1 = stats.STATS(true_values[-ntest:], predictions[-ntest:], threshold=0.75)
 s1.print_stats()
 # s1 = stats.STATS(true_values[-ntrain:], predictions[-ntrain:], threshold=0.8)
 # s1.print_stats()
 
-# plot the last batch of the data
-plot.plot_results(true_values[-ntrain:], predictions[-ntrain:])
+# plot the result
+plot.plot_results(true_values[-ntest:], predictions[-ntest:])
