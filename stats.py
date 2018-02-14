@@ -1,4 +1,6 @@
 
+epsilon = 1e-8
+
 class STATS:
 
     def __init__(self, true_data, predicted_data, threshold=0.5):
@@ -31,14 +33,14 @@ class STATS:
 
     def _calc_stats(self):
         self.total_condition = self.TP + self.FP + self.TN + self.FN
-        self.accuracy = (self.TP + self.TN) / self.total_condition
-        self.precision = self.TP / (self.TP + self.FP)
-        self.recall = self.TP / (self.TP + self.FN)
-        self.F1 = 2 * self.precision * self.recall / (self.precision + self.recall)
+        self.accuracy = (self.TP + self.TN) / (self.total_condition + epsilon)
+        self.precision = self.TP / (self.TP + self.FP + epsilon)
+        self.recall = self.TP / (self.TP + self.FN + epsilon)
+        self.F1 = 2 * self.precision * self.recall / (self.precision + self.recall + epsilon)
 
     def print_stats(self):
 
-        print('[Confusion Matrix]')
+        print('----------[Confusion Matrix]----------')
         print('> total_data={:}, threshold={}, ignored={}, total_condition={}'.format(
             len(self.true_data), self.threshold, self.ignored, self.total_condition))
         print('> TP:{}, FP:{}, TN:{}, FN:{}'.format(self.TP, self.FP, self.TN, self.FN))
