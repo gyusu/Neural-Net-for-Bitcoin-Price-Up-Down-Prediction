@@ -21,7 +21,15 @@ dl = etl.ETL(
     losscut_percent_change=configs['rule']['losscut_percent_change'],
     train_test_split=configs['data']['train_test_split']
 )
-if input("DO YOU WANT TO CREATE NEW DATAFILE ? (y / n)") in ['y','Y']:
+
+ans_create_data = input("DO YOU WANT TO CREATE NEW DATAFILE ? (y / n)")
+if configs['model']['filename_load_model']:
+    ans_load_model = input('DO YOU WANT TO LOAD TRAINED MODEL ? \'{}\' (y / n)'
+                           .format(configs['model']['filename_load_model']))
+else:
+    ans_load_model = False
+
+if ans_create_data in ['y','Y']:
     dl.create_clean_datafile()
 
 with h5py.File(configs['data']['filename_clean'], 'r') as hf:
@@ -49,22 +57,13 @@ model = lstm.LSTM(sess, configs['data']['x_window_size'], ncols,
 
 sess.run(tf.global_variables_initializer())
 
-
-if configs['model']['filename_load_model']:
-    ans = input('DO YOU WANT TO LOAD TRAINED MODEL ? \'{}\' (y / n)'.format(configs['model']['filename_load_model']))
-
-    if ans in['y', 'Y']:
-        # Load a trained model
-        model.load_model(configs['model']['filename_load_model'])
-    else:
-        # Train the model
-        data_gen_train = dl.generate_clean_data(0, ntrain)
-        model.training(configs['model']['epochs'], steps_per_epoch, data_gen_train, save=True)
+if ans_load_model in ['y', 'Y']:
+    # Load a trained model
+    model.load_model(configs['model']['filename_load_model'])
 else:
     # Train the model
     data_gen_train = dl.generate_clean_data(0, ntrain)
     model.training(configs['model']['epochs'], steps_per_epoch, data_gen_train, save=True)
-
 
 ntest = nrows - ntrain
 steps_test = int(ntest / configs['data']['batch_size'])
