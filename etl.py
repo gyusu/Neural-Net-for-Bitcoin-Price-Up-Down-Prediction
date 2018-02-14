@@ -3,12 +3,14 @@ import h5py
 import numpy as np
 import pandas as pd
 
+
 class ETL:
     """Extract Transform Load class for all data operations pre model inputs.
     Data is read in generative way to allow for large datafiles and low memory utilisation"""
 
     def __init__(self, filename_in, filename_out, batch_size, x_window_size,
-                 y_window_size, y_col, x_col, filter_cols, target_percent_change, train_test_split):
+                 y_window_size, y_col, x_col, filter_cols, target_percent_change,
+                 losscut_percent_change, train_test_split):
         self.filename_in = filename_in
         self.filename_out = filename_out
         self.batch_size = batch_size
@@ -18,9 +20,10 @@ class ETL:
         self.y_col = y_col
         self.filter_cols = filter_cols
         self.target_percent_change = target_percent_change
+        self.losscut_percent_change = losscut_percent_change
         self.train_test_split = train_test_split
 
-    def clean_data(self):
+    def _clean_data(self):
         """Clean and Normalize the data in batches `batch_size` at a time"""
         data = pd.read_csv(self.filename_in, index_col=0)
 
@@ -54,7 +57,8 @@ class ETL:
 
             latest_x = data[(i + self.x_window_size -1):(i + self.x_window_size)]
             y_window_data = data[(i + self.x_window_size):(i + self.x_window_size + self.y_window_size)]
-            y = self.is_n_percent_up(latest_x.values[-1, x_col], y_window_data.values[:, y_col], self.target_percent_change)
+            y = self.is_target_percent_up(latest_x.values[-1, x_col], y_window_data.values[:, y_col],
+                                     self.target_percent_change)
 
             # for checking y's distribution
             if y in dist.keys(): dist[y] += 1
@@ -76,10 +80,10 @@ class ETL:
         nrows = len(x_data)
         ntrain = int(self.train_test_split * nrows)
         steps_per_epoch = int(ntrain / self.batch_size)
-        ntrain = steps_per_epoch * self.batch_size
+        self.ntrain = steps_per_epoch * self.batch_size
 
         # Random Shuffle ONLY FOR training data
-        p = np.random.permutation(ntrain)
+        p = np.random.permutation(self.ntrain)
         p = np.append(p, list(i for i in range(ntrain, len(x_np_arr))))
         x_np_arr, y_np_arr = x_np_arr[p], y_np_arr[p]
 
@@ -90,11 +94,14 @@ class ETL:
         print('> Creating x & y data files...')
 
         with h5py.File(self.filename_out, 'w') as hf:
-            x, y = self.clean_data()
+            x, y = self._clean_data()
             dset_x = hf.create_dataset('x', shape=x.shape)
             dset_y = hf.create_dataset('y', shape=y.shape)
+            dset_ntrain = hf.create_dataset('ntrain', shape=(1,))
+
             dset_x[:] = x
             dset_y[:] = y
+            dset_ntrain[:] = self.ntrain
 
     def generate_clean_data(self, start_index, end_index):
 
@@ -115,6 +122,12 @@ class ETL:
                 i += self.batch_size
                 yield (data_x, data_y)
 
+    def zero_base_standardize(self, data, abs_base=pd.DataFrame()):
+        """Standardize dataframe to be zero based percentage returns from i=0"""
+        if abs_base.empty: abs_base = data.iloc[0]
+        data_standardized = (data / abs_base) - 1
+        return (abs_base, data_standardized)
+
     def min_max_normalize(self, data, data_min=pd.DataFrame(), data_max=pd.DataFrame()):
         """Normalize a Pandas dataframe using column-wise min-max normalization
         (can use custom min, max if desired)"""
@@ -123,13 +136,30 @@ class ETL:
         data_normalized = (data - data_min) / (data_max - data_min)
         return (data_min, data_max, data_normalized)
 
-    def is_n_percent_up(self, x: float, y: list, n: float):
+    def is_target_percent_up(self, x: float, y: list, target: float):
 
         cnt = 0
-        n = n * 0.01
+        target = target * 0.01
         for cur_y in y:
-            if (cur_y - x) / x >= n:
+            percent_change = (cur_y - x) / x
+            if percent_change >= target:
                 cnt += 1
+
+        if cnt > 0:
+            cnt = 1
+
+        return cnt
+
+    def is_target_percent_up_losscut(self, x: float, y: list, target: float, losscut: float):
+
+        cnt = 0
+        target = target * 0.01
+        for cur_y in y:
+            percent_change = (cur_y - x) / x
+            if percent_change >= target:
+                cnt += 1
+            elif cnt == 0 and percent_change <= losscut:
+                break
 
         if cnt > 0:
             cnt = 1
