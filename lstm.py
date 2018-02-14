@@ -7,7 +7,7 @@ import os
 class LSTM:
 
     def __init__(self, session: tf.Session, x_window_size: int, ncols: int,
-               dirname_save_model: str, name: str="main") -> None:
+               dirname_save_model: str, class_weight=0.5, name: str="main") -> None:
         """
         Args:
           session (tf.Session): Tensorflow session
@@ -21,6 +21,9 @@ class LSTM:
         self.ncols = ncols
         self.net_name = name
         self.save_path = dirname_save_model
+
+        self.class_weight = class_weight
+
         self._build_network()
 
     def _build_network(self, l_rate=0.001) -> None:
@@ -29,7 +32,7 @@ class LSTM:
         Args:
           l_rate (float, optional): Learning rate
         """
-        with tf.variable_scope(self.net_name, reuse=tf.AUTO_REUSE):
+        with tf.variable_scope(self.net_name):
 
             # [batch_size(None), window_size, num of cols]
             self.X = tf.placeholder(tf.float32, [None, self.x_window_size, self.ncols], name='x')
@@ -41,19 +44,21 @@ class LSTM:
             self.output_keep_prob = tf.placeholder(tf.float32, name='output_keep_prob')
 
             cell = []
-            cell_1 = tf.contrib.rnn.LSTMCell(num_units=200, state_is_tuple=True, use_peepholes=True)
+            cell_1 = tf.contrib.rnn.LSTMCell(num_units=100, state_is_tuple=True, use_peepholes=True)
             cell_1 = tf.contrib.rnn.DropoutWrapper(cell_1, output_keep_prob=self.output_keep_prob)
             cell.append(cell_1)
 
             cell = tf.contrib.rnn.MultiRNNCell(cell)
-            outputs, states = tf.nn.dynamic_rnn(cell, self.X, dtype=tf.float32)
+
+            outputs, states = tf.nn.dynamic_rnn(cell, self.X, dtype=tf.float32, scope='rnn1')
 
             # # outputs[:, -1] 는 LSTM layer의 output 중에서 마지막 것만 사용한다는 의미.
             self.Y_pred = tf.contrib.layers.fully_connected(
-                outputs[:, -1], 1, activation_fn=tf.nn.sigmoid)
+                outputs[:, -1], 1, activation_fn=tf.nn.sigmoid, scope='fc1')
 
             # cost/loss
-            self.loss = -tf.reduce_mean(self.Y * tf.log(self.Y_pred) + (1 - self.Y) * tf.log(1 - self.Y_pred))
+            self.loss = -tf.reduce_mean(self.Y * self.class_weight * tf.log(tf.clip_by_value(self.Y_pred, 0.1, 1.0))
+                                        + (1 - self.Y) * tf.log(tf.clip_by_value(1 - self.Y_pred, 0.1, 1.0)))
 
             # optimizer
             self.optimizer = tf.train.AdamOptimizer(l_rate)
@@ -66,17 +71,28 @@ class LSTM:
 
     def training(self, epochs, steps_per_epoch, data_gen_train, save=False):
         self.session.run(tf.global_variables_initializer())
-        step_loss=0
 
+        # for debugging
+        all_vars = tf.global_variables()
+        def get_var(name):
+            for i in range(len(all_vars)):
+                if all_vars[i].name.startswith(name):
+                    return all_vars[i]
+            return None
+        fc1_var = get_var('main/fc1/weights')
+        rnn1_var = get_var('main/rnn1')
+
+        step_loss=0
         for i in range(epochs):
             for j in range(steps_per_epoch):
                 batch_x, batch_y = next(data_gen_train)
                 batch_y = np.array(batch_y).reshape(-1, 1)
+
                 _, step_loss = self.session.run([self.train, self.loss], feed_dict={
                     self.X: batch_x, self.Y: batch_y, self.output_keep_prob: 0.8})
-                train_predict = self.session.run(self.Y_pred,
+                train_predict, fc1_var_np, rnn1_var_np = self.session.run([self.Y_pred, fc1_var, rnn1_var],
                                                 feed_dict={self.X: batch_x, self.output_keep_prob: 1.0})
-
+                # print(train_predict)
                 print("[epoch: {}, step: {}] loss: {}".format(i, j, step_loss))
 
             if save:
