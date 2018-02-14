@@ -34,6 +34,7 @@ epoch : 10
 
 **result in graph**
 ![180214result_1](./result/180214result1.PNG)
+**result in graph with close price**
 ![180214result_1](./result/180214result2.PNG)
 
 **[Confusion Matrix] threshold = 0.5**
