@@ -17,11 +17,12 @@
         "y_predict_column": "high"
     },
     "model": {
-        "epochs": 1,
+        "epochs": 10,
         "dirname_save_model": "saved_models/",
-        "filename_model": "data/model_saved.h5"
+        "filename_load_model": "epoch9_loss6.64e-01"
     },
     "rule": {
-        "target_percent_change": 1
+        "target_percent_change": 1,
+        "losscut_percent_change": 1
     }
 }
